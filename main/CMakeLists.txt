@@ -1,0 +1,23 @@
+idf_component_register(
+    SRCS
+        "app_hf_msg_set.c"
+        "bt_app_core.c"
+        "bt_app_hf.c"
+        "codec2_wrapper.c"
+        "display.c"
+        "espnow_transport.c"
+        "gpio_pcm_config.c"
+        "main.c"
+        "walkie_talkie.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        bt
+        console
+        esp_coex
+        esp_wifi
+        esp_event
+        esp_netif
+        nvs_flash
+        driver
+        codec2
+)

@@ -1,0 +1,48 @@
+# ESP-IDF build output
+build/
+
+# Generated sdkconfig (keep defaults, ignore generated)
+sdkconfig
+sdkconfig.old
+
+# Codec2 source (fetched by fetch_codec2.sh, not committed)
+components/codec2/codec2-src/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / IDE
+.vscode/settings.json
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+*.swp
+*.swo
+*~
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+idf.py_log
+
+# Compiled objects / binaries
+*.o
+*.a
+*.elf
+*.bin
+*.map
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+esp-adf/
+main/*.backup

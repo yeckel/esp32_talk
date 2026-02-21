@@ -1,0 +1,155 @@
+diff --git a/src/codec2.c b/src/codec2.c
+index b27626a..ca128e1 100644
+--- a/src/codec2.c
++++ b/src/codec2.c
+@@ -488,7 +488,8 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[],
+   float ak[2][LPC_ORD + 1];
+   int i, j;
+   unsigned int nbit = 0;
+-  COMP Aw[FFT_ENC];
++  /* Heap-allocate to keep stack low on embedded */
++  COMP *Aw = (COMP *)malloc(FFT_ENC * sizeof(COMP));
+ 
+   assert(c2 != NULL);
+ 
+@@ -544,6 +545,7 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[],
+   c2->prev_model_dec = model[1];
+   c2->prev_e_dec = e[1];
+   for (i = 0; i < LPC_ORD; i++) c2->prev_lsps_dec[i] = lsps[1][i];
++  free(Aw);
+ }
+ 
+ /*---------------------------------------------------------------------------*\
+@@ -1692,7 +1694,8 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model,
+ \*---------------------------------------------------------------------------*/
+ 
+ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]) {
+-  COMP Sw[FFT_ENC];
++  /* Heap-allocate to keep stack usage under 1 KB on embedded targets */
++  COMP *Sw = (COMP *)malloc(FFT_ENC * sizeof(COMP));
+   float pitch;
+   int i;
+   int n_samp = c2->n_samp;
+@@ -1722,6 +1725,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]) {
+ #ifdef DUMP
+   dump_model(model);
+ #endif
++  free(Sw);
+ }
+ 
+ /*---------------------------------------------------------------------------* \
+diff --git a/src/nlp.c b/src/nlp.c
+index 53cf040..3d21727 100644
+--- a/src/nlp.c
++++ b/src/nlp.c
+@@ -217,7 +217,8 @@ float nlp(
+ ) {
+   NLP *nlp;
+   float notch;          /* current notch filter output          */
+-  COMP Fw[PE_FFT_SIZE]; /* DFT of squared signal (input/output) */
++  /* Heap-allocate to avoid 4 KB stack hit on embedded targets */
++  COMP *Fw = (COMP *)malloc(PE_FFT_SIZE * sizeof(COMP));
+   float gmax;
+   int gmax_bin;
+   int m, i, j;
+@@ -357,6 +358,7 @@ float nlp(
+   PROFILE_SAMPLE_AND_LOG2(start, "      nlp int");
+ 
+   *prev_f0 = best_f0;
++  free(Fw);
+ 
+   return (best_f0);
+ }
+diff --git a/src/quantise.c b/src/quantise.c
+index da1d821..a411974 100644
+--- a/src/quantise.c
++++ b/src/quantise.c
+@@ -323,9 +323,10 @@ void lpc_post_filter(codec2_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
+                      int order, int dump, float beta, float gamma,
+                      int bass_boost, float E) {
+   int i;
+-  float x[FFT_ENC];          /* input to FFTs                */
+-  COMP Ww[FFT_ENC / 2 + 1];  /* weighting spectrum           */
+-  float Rw[FFT_ENC / 2 + 1]; /* R = WA                       */
++  /* Heap-allocate to avoid ~5 KB stack hit on embedded targets */
++  float *x = (float *)malloc(FFT_ENC * sizeof(float));
++  COMP  *Ww = (COMP *)malloc((FFT_ENC / 2 + 1) * sizeof(COMP));
++  float *Rw = (float *)malloc((FFT_ENC / 2 + 1) * sizeof(float));
+   float e_before, e_after, gain;
+   float Pfw;
+   float max_Rw, min_Rw;
+@@ -409,6 +410,9 @@ void lpc_post_filter(codec2_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
+   }
+ 
+   PROFILE_SAMPLE_AND_LOG2(tr, "        filt");
++  free(x);
++  free(Ww);
++  free(Rw);
+ }
+ 
+ /*---------------------------------------------------------------------------*\
+@@ -447,7 +451,8 @@ void aks_to_M2(codec2_fftr_cfg fftr_fwd_cfg, float ak[], /* LPC's */
+ 
+   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
+   {
+-    float a[FFT_ENC]; /* input to FFT for power spectrum */
++    /* Heap-allocate to avoid 2 KB stack hit on embedded targets */
++    float *a = (float *)malloc(FFT_ENC * sizeof(float));
+ 
+     for (i = 0; i < FFT_ENC; i++) {
+       a[i] = 0.0;
+@@ -455,12 +460,13 @@ void aks_to_M2(codec2_fftr_cfg fftr_fwd_cfg, float ak[], /* LPC's */
+ 
+     for (i = 0; i <= order; i++) a[i] = ak[i];
+     codec2_fftr(fftr_fwd_cfg, a, Aw);
++    free(a);
+   }
+   PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft");
+ 
+   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
+ 
+-  float Pw[FFT_ENC / 2];
++  float *Pw = (float *)malloc((FFT_ENC / 2) * sizeof(float));
+ 
+ #ifndef FDV_ARM_MATH
+   for (i = 0; i < FFT_ENC / 2; i++) {
+@@ -542,6 +548,7 @@ void aks_to_M2(codec2_fftr_cfg fftr_fwd_cfg, float ak[], /* LPC's */
+   *snr = 10.0 * log10f(signal / noise);
+ 
+   PROFILE_SAMPLE_AND_LOG2(tpf, "      rec");
++  free(Pw);
+ }
+ 
+ /*---------------------------------------------------------------------------*\
+diff --git a/src/sine.c b/src/sine.c
+index 814c269..8a2184c 100644
+--- a/src/sine.c
++++ b/src/sine.c
+@@ -102,7 +102,8 @@ C2CONST c2const_create(int Fs, float framelength_s) {
+ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg,
+                           float w[], float W[]) {
+   float m;
+-  COMP wshift[FFT_ENC];
++  /* Heap-allocate to avoid 8 KB stack hit on embedded platforms */
++  COMP *wshift = (COMP *)malloc(FFT_ENC * sizeof(COMP));
+   int i, j;
+   int m_pitch = c2const->m_pitch;
+   int nw = c2const->nw;
+@@ -155,7 +156,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg,
+        nw/2              nw/2
+   */
+ 
+-  COMP temp[FFT_ENC];
++  COMP *temp = (COMP *)malloc(FFT_ENC * sizeof(COMP));
+ 
+   for (i = 0; i < FFT_ENC; i++) {
+     wshift[i].real = 0.0;
+@@ -194,6 +195,8 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg,
+     W[i] = temp[i + FFT_ENC / 2].real;
+     W[i + FFT_ENC / 2] = temp[i].real;
+   }
++  free(wshift);
++  free(temp);
+ }
+ 
+ /*---------------------------------------------------------------------------*\
