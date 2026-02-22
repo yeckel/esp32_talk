@@ -25,8 +25,8 @@ else
 fi
 
 echo ""
-echo "Applying ESP32 stack-fix patch (heap-allocate FFT arrays in sine.c) ..."
-patch -d "${TARGET_DIR}" -p1 < "${SCRIPT_DIR}/esp32_sine_stack_fix.patch"
+echo "Applying ESP32 Codec2 memory/stability patch (3200-only + shared scratch) ..."
+patch -d "${TARGET_DIR}" -p1 < "${SCRIPT_DIR}/esp32_codec2_3200_mem_stability.patch"
 
 echo "Codec2 source is ready at: ${TARGET_DIR}"
 echo ""
